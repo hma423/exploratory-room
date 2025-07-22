@@ -9,7 +9,7 @@ cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 600)
 
 hands = mp.solutions.hands
 hand = hands.Hands()
-
+drawing = mp.solutions.drawing_utils
 
 while True:
     success, frame = cap.read()
@@ -19,6 +19,8 @@ while True:
         if result.multi_hand_landmarks:
             for landmark in result.multi_hand_landmarks:
                 print(landmark) 
+                drawing.draw_landmarks(frame, landmark, hands.HAND_CONNECTIONS)
+                
         cv2.imshow("capture image", frame)
         if cv2.waitKey(1)  == ord('q'):
             break

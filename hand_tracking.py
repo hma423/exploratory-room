@@ -1,6 +1,8 @@
 import mediapipe as mp 
 import cv2 
 import math
+import numpy as np 
+
 
 print("************************** START OF PROGRAM ****************************")
 print("\n\npress q to quit\n")
@@ -21,12 +23,30 @@ while True:
         
         if result.multi_hand_landmarks:
             for landmark in result.multi_hand_landmarks:
-                drawing.draw_landmarks(frame, landmark, hands.HAND_CONNECTIONS)
                 h, w, _ = frame.shape
-                
-
                 thumb_tip = landmark.landmark[4]
                 pointer_finger_tip = landmark.landmark[8]
+
+                # pointer_vector = np.array([int(landmark.landmark[0] * w), int(landmark.landmark[5] * h)])
+                # pinky_vector  = np.array([int(landmark.landmark[0] * w), int(landmark.landmark[17] * h)])
+
+
+                # Wrist coordinates
+                wrist_x = int(landmark.landmark[0].x * w)
+                wrist_y = int(landmark.landmark[0].y * h)
+
+                # Pointer MCP (index finger base)
+                pointer_x = int(landmark.landmark[5].x * w)
+                pointer_y = int(landmark.landmark[5].y * h)
+
+                # Pinky MCP (pinky finger base)
+                pinky_x = int(landmark.landmark[17].x * w)
+                pinky_y = int(landmark.landmark[17].y * h)
+
+                # Draw lines
+                cv2.line(frame, (wrist_x, wrist_y), (pointer_x, pointer_y), (0, 255, 255), 2)
+                cv2.line(frame, (wrist_x, wrist_y), (pinky_x, pinky_y), (255, 0, 255), 2)
+
 
                 normalized_thumb = (int (thumb_tip.x * w) , int (thumb_tip.y * h))
                 normalized_pointer = (int ( pointer_finger_tip.x * w) , int ( pointer_finger_tip.y * h))

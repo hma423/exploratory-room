@@ -2,6 +2,7 @@ import mediapipe as mp
 import cv2 
 import math
 import numpy as np 
+import time
 
 
 print("************************** START OF PROGRAM ****************************")
@@ -15,6 +16,13 @@ hand = hands.Hands()
 drawing = mp.solutions.drawing_utils
 
 
+def find_angle(v1, v2):
+    dot = np.dot(v1, v2)
+    cross = v1[0] * v2[1]  - v1[1] * v2[0]  
+    return np.arctan2(dot, cross)
+
+
+prev_angle = None
 while True:
     success, frame = cap.read()
     if success:
@@ -27,11 +35,6 @@ while True:
                 thumb_tip = landmark.landmark[4]
                 pointer_finger_tip = landmark.landmark[8]
 
-                # pointer_vector = np.array([int(landmark.landmark[0] * w), int(landmark.landmark[5] * h)])
-                # pinky_vector  = np.array([int(landmark.landmark[0] * w), int(landmark.landmark[17] * h)])
-
-
-                # Wrist coordinates
                 wrist_x = int(landmark.landmark[0].x * w)
                 wrist_y = int(landmark.landmark[0].y * h)
 
@@ -46,6 +49,43 @@ while True:
                 # Draw lines
                 cv2.line(frame, (wrist_x, wrist_y), (pointer_x, pointer_y), (0, 255, 255), 2)
                 cv2.line(frame, (wrist_x, wrist_y), (pinky_x, pinky_y), (255, 0, 255), 2)
+
+
+                #vectors 
+                wrist = np.array([landmark.landmark[0].x * w, landmark.landmark[0].y * h])
+                pointer = np.array([landmark.landmark[5].x * w, landmark.landmark[5].y * h])
+                pinky = np.array([landmark.landmark[17].x * w, landmark.landmark[17].y * h])
+
+                #calclulating angular rotation 
+                vec_pointer = pointer - wrist 
+                vec_pinky = pinky - wrist
+
+                angle = find_angle(vec_pointer, vec_pinky)
+                curr_time = time.time()
+                
+                if prev_angle is not None:
+                    delta_angle = angle - prev_angle
+                    delta_time = curr_time - prev_time
+
+                    # Normalize angle to [-pi, pi]
+                    delta_angle = (delta_angle + np.pi) % (2 * np.pi) - np.pi
+
+                    angular_velocity = delta_angle / delta_time  # rad/s
+
+                    # Display
+                    direction = "CCW" if delta_angle > 0 else "CW" if delta_angle < 0 else "None"
+                    cv2.putText(frame, f'Rot Dir: {direction}', (30, 50), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.7, (0, 255, 0), 2)
+                    cv2.putText(frame, f'Ang Vel: {angular_velocity:.2f} rad/s', (30, 80),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
+
+                prev_angle = angle
+                prev_time = curr_time
+
+
+
+
+        
 
 
                 normalized_thumb = (int (thumb_tip.x * w) , int (thumb_tip.y * h))

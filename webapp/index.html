@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+
+
+<html>
+
+    <head>
+        <meta charset="utf-8" />
+        <title> Exploratory Room </title>
+        <link rel ="stylesheet" href="css/style.css"/>
+        
+    </head>
+
+    <body>
+        <header>
+            <h1> Explorartory Room</h1>
+        </header>
+        <h2>Upload Images</h2>
+        <input type="file" id="fileInput" multiple accept="image/*" />
+        <div id="imageList"></div>
+        <script>
+            const fileInput = document.getElementById('fileInput');
+            const preview = document.getElementById('preview');
+
+            fileInput.addEventListener('change', () => {
+            const files = Array.from(fileInput.files);
+            files.forEach(file =>{
+                const url = URL.createObjectURL(file);
+                const container = document.createElement('div');
+                container.classList.add('image-item');
+
+                const img = document.createElement('img');
+                img.src = url;
+
+                const btn = document.createElement('button');
+                btn.textContent = '✕';
+                btn.className = 'remove-btn';
+                btn.addEventListener('click', () => {
+                container.remove();
+                    URL.revokeObjectURL(url);
+                });
+
+                container.appendChild(img);
+                container.appendChild(btn);
+                imageList.appendChild(container);
+
+            });
+            fileInput.value = '';
+
+            });
+        </script>
+
+
+
+
+        <!-- <main>
+            <div id = "container3D"></div>
+
+        </main>
+         -->
+        <!-- <script type="module" src = "js/main.js"></script> -->
+    </body>
+
+
+
+</html>

@@ -1,0 +1,11 @@
+Model Information:
+* title:	Cubic Livingroom
+* source:	https://sketchfab.com/3d-models/cubic-livingroom-05d5b6c5fa374774bdd8bbfa1c8afbcd
+* author:	MagdaLenaS2312 (https://sketchfab.com/MagdaLenaS2312)
+
+Model License:
+* license type:	CC-BY-NC-SA-4.0 (http://creativecommons.org/licenses/by-nc-sa/4.0/)
+* requirements:	Author must be credited. No commercial use. Modified versions must have the same license.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Cubic Livingroom" (https://sketchfab.com/3d-models/cubic-livingroom-05d5b6c5fa374774bdd8bbfa1c8afbcd) by MagdaLenaS2312 (https://sketchfab.com/MagdaLenaS2312) licensed under CC-BY-NC-SA-4.0 (http://creativecommons.org/licenses/by-nc-sa/4.0/)

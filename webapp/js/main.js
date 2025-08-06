@@ -1,83 +1,147 @@
-import * as THREE from "https://cdn.skypack.dev/three@0.129.0/build/three.module.js";
-import { OrbitControls } from "https://cdn.skypack.dev/three@0.129.0/examples/jsm/controls/OrbitControls.js";
-import { GLTFLoader } from "https://cdn.skypack.dev/three@0.129.0/examples/jsm/loaders/GLTFLoader.js";
+import * as THREE from "https://cdn.skypack.dev/three@0.129.0";
 
+const fileInput = document.getElementById("fileInput");
+const startButton = document.getElementById("startButton");
+const uploadUI = document.getElementById("uploadUI");
+const container3D = document.getElementById("container3D");
 
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight , 0.1, 1000);
+let uploadedImages = [];
+let marqueeActive = false;
+// Handle file uploads
+fileInput.addEventListener("change", (event) => {
+  const files = Array.from(event.target.files);
+  uploadedImages = files;
 
-let mouseX = window.innerWidth / 2;
-let mouseY = window.innerHeight / 2;
+  const imageList = document.getElementById("imageList");
+  imageList.innerHTML = "";
+  files.forEach((file) => {
+                const url = URL.createObjectURL(file);
+                const container = document.createElement('div');
+                container.classList.add('image-item');
 
-let object;
-let controls;
-let objToRender = 'cubic';
+                const img = document.createElement('img');
+                img.src = url;
 
-const loader = new GLTFLoader();
+                const btn = document.createElement('button');
+                btn.textContent = '✕';
+                btn.className = 'remove-btn';
+                btn.addEventListener('click', () => {
+                container.remove();
+                    URL.revokeObjectURL(url);
+                });
 
+                container.appendChild(img);
+                container.appendChild(btn);
+                imageList.appendChild(container);
+  });
+});
 
-loader.load(
-    `model/${objToRender}/scene.gltf`,
-    function(gltf){
-        object = gltf.scene
-        scene.add(object)
-    },
-    function(xhr){
-        console.log((xhr.loaded /xhr.total * 100 ) + '% loaded');
-    },
-    function (error){
-        console.error(error);
-    }
+// Start 3D Marquee on button click
+startButton.addEventListener("click", () => {
+    console.log("CLICKED STARTBUTTON")
+  if (uploadedImages.length === 0) {
+    alert("Please  at least one image first.");
+    return;
+  }
 
-);
+  // Hide upload UI
+    document.getElementById("uploadUI").style.display = "none";
+    document.getElementById("marqueeContainer").style.display = "block";    
+    document.getElementById("ExploratoryTitle").style.display = 'none';
+    marqueeActive = true
 
+  //show container ui 
 
+  // Launch 3D view
+  startMarquee(uploadedImages);
+});
 
-const renderer = new THREE.WebGLRenderer({ alpha: true }); //Alpha: true allows for the transparent background
-renderer.setSize(window.innerWidth, window.innerHeight);
+// ------------------
+// Three.js Section
+// ------------------
 
-//Add the renderer to the DOM
-document.getElementById("container3D").appendChild(renderer.domElement);
+function startMarquee(files) {
+  // Hide upload UI, show 3D marquee
+  document.getElementById("uploadUI").style.display = "none";
+  document.getElementById("marqueeContainer").style.display = "block";
 
-//Set how far the camera will be from the 3D model
-camera.position.z = objToRender === "dino" ? 25 : 500;
+  const container3D = document.getElementById("container3D");
 
-//Add lights to the scene, so we can actually see the 3D model
-const topLight = new THREE.DirectionalLight(0xffffff, 1); // (color, intensity)
-topLight.position.set(500, 500, 500) //top-left-ish
-topLight.castShadow = true;
-scene.add(topLight);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(
+    75,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+  );
+  camera.position.z = 20;
 
-const ambientLight = new THREE.AmbientLight(0x333333, objToRender === "dino" ? 5 : 1);
-scene.add(ambientLight);
+  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  container3D.innerHTML = ""; // clear previous render if any
+  container3D.appendChild(renderer.domElement);
 
+  const light = new THREE.AmbientLight(0xffffff, 1);
+  scene.add(light);
 
-// //Render the scene
-// function animate() {
-//   requestAnimationFrame(animate);
-//   //Here we could add some code to update the scene, adding some automatic movement
+  const group = new THREE.Group();
+  scene.add(group);
 
-//   //Make the eye move
-//   if (object && objToRender === "eye") {
-//     //I've played with the constants here until it looked good 
-//     object.rotation.y = -3 + mouseX / window.innerWidth * 3;
-//     object.rotation.x = -1.2 + mouseY * 2.5 / window.innerHeight;
-//   }
-//   renderer.render(scene, camera);
-// }
+  const radius = 10;
+  const planeWidth = 5;
+  const planeHeight = 3;
 
-// //Add a listener to the window, so we can resize the window and the camera
-// window.addEventListener("resize", function () {
-//   camera.aspect = window.innerWidth / window.innerHeight;
-//   camera.updateProjectionMatrix();
-//   renderer.setSize(window.innerWidth, window.innerHeight);
-// });
+  files.forEach((file, index) => {
+    const url = URL.createObjectURL(file);
+    const texture = new THREE.TextureLoader().load(url, () => {
+      URL.revokeObjectURL(url); // Clean up memory
+    });
 
-// //add mouse position listener, so we can make the eye move
-// document.onmousemove = (e) => {
-//   mouseX = e.clientX;
-//   mouseY = e.clientY;
-// }
+    const material = new THREE.MeshBasicMaterial({
+      map: texture,
+      side: THREE.DoubleSide,
+    });
+    const geometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
+    const mesh = new THREE.Mesh(geometry, material);
 
-//Start the 3D rendering
-animate();
+    // Half-circle layout (only 180 degrees)
+    const angle = (index / (files.length - 1)) * Math.PI; // 0 to π
+    const x = radius * Math.cos(angle);
+    const z = radius * Math.sin(angle);
+
+    mesh.position.set(x, 0, z);
+    mesh.lookAt(0, 0, 0);
+
+    group.add(mesh);
+  });
+
+  // Animation
+  function animate() {
+    requestAnimationFrame(animate);
+    // group.rotation.y += 0.005;
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // Handle screen resize
+  window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && marqueeActive) {
+    marqueeActive = false;
+    document.getElementById("uploadUI").style.display = "block";
+    document.getElementById("marqueeContainer").style.display = "none";
+
+    // Dispose Three.js
+    renderer.dispose();
+    renderer.domElement.remove();
+    scene = null;
+    camera = null;
+    renderer = null;
+  }
+});

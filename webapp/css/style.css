@@ -78,3 +78,36 @@ h2,h1{
   cursor: pointer;
   font-size: 12px;
 }
+
+body {
+  margin: 0;
+  font-family: sans-serif;
+  background: #111;
+  color: #fff;
+  overflow-x: hidden;
+  text-align: center;
+}
+
+input[type="file"] {
+  margin: 20px 0;
+}
+
+#imageList {
+  margin-top: 10px;
+}
+
+#container3D {
+  margin-top: 20px;
+  border-top: 1px solid #444;
+}
+
+#startButton {
+  padding: 10px 20px;
+  font-size: 16px;
+  margin-top: 20px;
+  cursor: pointer;
+}
+
+#uploadUI {
+  padding: 20px;
+}

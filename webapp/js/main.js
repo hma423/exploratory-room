@@ -17,10 +17,11 @@ startButton.addEventListener("click", () => {
 });
 
 
+
 function startMarquee(files) {
   const container = document.getElementById("container3D");
 
-  // Scene setup
+  // --- Scene setup ---
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#191920");
 
@@ -34,62 +35,126 @@ function startMarquee(files) {
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
+  container.innerHTML = "";
   container.appendChild(renderer.domElement);
 
-  const scaleFactor = 1.5; // enlargement factor
-  const spacing = 2; // horizontal gap between images
+  // --- Layout settings ---
   const numRows = 4;
-  const rows = [];
-  const rowVelocity = new Array(numRows).fill(0);
+  const targetHeight = 4.5; // Fixed gallery height for all images (world units)
+  const horizontalSpacing = 1.5; // space between images in world units
+  const verticalGap = 8; // space between rows in world units
+  const minSlotsPerRow = 6;
+  const estimatedSlotWidthPx = 200;
+  const imagesPerRow = Math.max(
+    minSlotsPerRow,
+    Math.ceil(window.innerWidth / estimatedSlotWidthPx)
+  );
 
-  // Create 4 evenly spaced rows
-  const verticalGap = 10; // distance between rows
+  // --- Rows ---
+  const rows = [];
+  const rowVelocities = new Array(numRows).fill(0);
+  const rowTotalWidths = new Array(numRows).fill(0);
+
   const startY = ((numRows - 1) / 2) * verticalGap;
   for (let r = 0; r < numRows; r++) {
-    const rowGroup = new THREE.Group();
-    rowGroup.position.y = startY - r * verticalGap;
-    scene.add(rowGroup);
-    rows.push(rowGroup);
+    const g = new THREE.Group();
+    g.position.y = startY - r * verticalGap;
+    scene.add(g);
+    rows.push(g);
   }
 
-  // Shuffle images randomly
-  const shuffledFiles = [...files].sort(() => Math.random() - 0.5);
+  const minImagesPerRow = 12;
 
-  // Load images into random rows
-  shuffledFiles.forEach((file, index) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      const aspect = img.width / img.height;
-      const targetHeight = 5 * scaleFactor;
-      const targetWidth = targetHeight * aspect;
+  // Fill slots with round robin + duplication
+  const slots = Array.from({ length: numRows }, () =>
+    Array.from({ length: minImagesPerRow }, () => ({ file: null, mesh: null }))
+  );
 
-      const geometry = new THREE.PlaneGeometry(targetWidth, targetHeight);
-      const texture = new THREE.TextureLoader().load(url, () => {
-        URL.revokeObjectURL(url);
-      });
+  files = Array.from(files); // ensure array form
 
-      const material = new THREE.MeshBasicMaterial({
-        map: texture,
-        side: THREE.DoubleSide,
-      });
-      const mesh = new THREE.Mesh(geometry, material);
+  for (let r = 0; r < numRows; r++) {
+    for (let c = 0; c < minImagesPerRow; c++) {
+      if (files.length === 0) break;
 
-      // Assign to a random row
-      const rowIndex = index % numRows;
-      const row = rows[rowIndex];
+      // Pick from uploaded images — duplicate randomly if not enough
+      const fileIndex = c < files.length ? c : Math.floor(Math.random() * files.length);
+      slots[r][c].file = files[fileIndex];
+    }
+  }
+  // --- Helper: create mesh from image ---
+  function createMeshFromImage(img) {
+    const texture = new THREE.Texture(img);
+    texture.needsUpdate = true;
+    texture.generateMipmaps = true;
+    texture.anisotropy = renderer.capabilities.getMaxAnisotropy() || 1;
 
-      // Position X so rows have initial horizontal spread
-      const xOffset = row.children.length * (targetWidth + spacing);
-      mesh.position.x = xOffset;
-      row.add(mesh);
+    const material = new THREE.MeshBasicMaterial({
+      map: texture,
+      side: THREE.DoubleSide,
+    });
+
+    const aspect = img.naturalWidth / img.naturalHeight;
+    const targetWidth = targetHeight * aspect;
+
+    const geometry = new THREE.PlaneGeometry(targetWidth, targetHeight);
+    const mesh = new THREE.Mesh(geometry, material);
+
+    mesh.userData = {
+      worldWidth: targetWidth,
+      worldHeight: targetHeight,
     };
-    img.src = url;
+
+    return mesh;
+  }
+
+  // --- Load and position images ---
+  const pendingLoads = [];
+  for (let r = 0; r < numRows; r++) {
+    let xCursor = 0;
+    for (let c = 0; c < imagesPerRow; c++) {
+      const slot = slots[r][c];
+      if (!slot.file) continue;
+
+      const url = URL.createObjectURL(slot.file);
+      const img = new Image();
+      const p = new Promise((resolve) => {
+        img.onload = () => {
+          const mesh = createMeshFromImage(img);
+          mesh.position.x = xCursor + mesh.userData.worldWidth / 2;
+          xCursor += mesh.userData.worldWidth + horizontalSpacing;
+          rows[r].add(mesh);
+          slot.mesh = mesh;
+          resolve();
+        };
+        img.onerror = resolve;
+      });
+      pendingLoads.push(p);
+      img.src = url;
+      img.onload
+        ? setTimeout(() => URL.revokeObjectURL(url), 1000)
+        : setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+    rowTotalWidths[r] = xCursor;
+  }
+
+  // --- Center rows after loading ---
+  Promise.all(pendingLoads).then(() => {
+    rows.forEach((row, rIdx) => {
+      if (row.children.length === 0) return;
+      const totalWidth = row.children.reduce(
+        (sum, m) => sum + (m.userData.worldWidth + horizontalSpacing),
+        0
+      );
+      row.children.forEach((m) => {
+        m.position.x -= totalWidth / 2;
+      });
+      rowTotalWidths[rIdx] = totalWidth;
+    });
   });
 
   scene.add(new THREE.AmbientLight(0xffffff, 1));
 
-  // Interaction
+  // --- Drag interaction ---
   let isDragging = false;
   let previousMouseX = 0;
   let activeRow = null;
@@ -97,13 +162,12 @@ function startMarquee(files) {
   window.addEventListener("mousedown", (event) => {
     isDragging = true;
     previousMouseX = event.clientX;
-
-    // Pick nearest row based on mouse Y
-    const mouseY = ((event.clientY / window.innerHeight) * 2 - 1) * -1;
-    const approxRow = Math.floor((mouseY + 1) / 2 * numRows);
-    activeRow = Math.min(Math.max(approxRow, 0), numRows - 1);
-
-    rowVelocity[activeRow] = 0; // stop momentum
+    const ndcY = -(event.clientY / window.innerHeight) * 2 + 1;
+    const rowHeightNdc = 2 / numRows;
+    let approxRow = Math.floor((ndcY + 1) / rowHeightNdc);
+    approxRow = Math.min(Math.max(approxRow, 0), numRows - 1);
+    activeRow = approxRow;
+    rowVelocities[activeRow] = 0;
   });
 
   window.addEventListener("mouseup", () => {
@@ -114,54 +178,64 @@ function startMarquee(files) {
   window.addEventListener("mousemove", (event) => {
     if (isDragging && activeRow !== null) {
       const deltaX = event.clientX - previousMouseX;
-      rows[activeRow].position.x += deltaX * 0.02;
-      rowVelocity[activeRow] = deltaX * 0.02;
+      const worldDelta = deltaX * 0.02;
+      rows[activeRow].position.x += worldDelta;
+      rowVelocities[activeRow] = worldDelta;
       previousMouseX = event.clientX;
     }
   });
 
-  // Infinite loop helper
-  function updateRowLoop(row) {
+  // --- Wrapping helper ---
+  function updateRowWrap(row, totalWidth) {
     if (row.children.length === 0) return;
-
-    const totalWidth = row.children.reduce(
-      (sum, mesh) => sum + mesh.geometry.parameters.width + spacing,
-      0
-    );
-
     row.children.forEach((mesh) => {
-      const worldPos = new THREE.Vector3();
-      mesh.getWorldPosition(worldPos);
-
-      if (worldPos.x < -totalWidth / 2 - spacing) {
+      if (mesh.position.x < -totalWidth / 2 - mesh.userData.worldWidth) {
         mesh.position.x += totalWidth;
-      }
-      if (worldPos.x > totalWidth / 2 + spacing) {
+      } else if (mesh.position.x > totalWidth / 2 + mesh.userData.worldWidth) {
         mesh.position.x -= totalWidth;
       }
     });
   }
 
-  // Render loop
+  // --- Animation loop ---
   function animate() {
     requestAnimationFrame(animate);
-
     rows.forEach((row, idx) => {
-      if (!isDragging && Math.abs(rowVelocity[idx]) > 0.001) {
-        row.position.x += rowVelocity[idx];
-        rowVelocity[idx] *= 0.95; // friction
+      if (!(isDragging && activeRow === idx)) {
+        if (Math.abs(rowVelocities[idx]) < 0.0005) {
+          rowVelocities[idx] = 0.002 * (idx % 2 === 0 ? 1 : -1);
+        }
+        row.position.x += rowVelocities[idx];
+        rowVelocities[idx] *= 0.96;
       }
-      updateRowLoop(row);
+      updateRowWrap(row, rowTotalWidths[idx]);
     });
-
     renderer.render(scene, camera);
   }
   animate();
 
-  // Resize
+  // --- Resize handling ---
   window.addEventListener("resize", () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 }
+
+
+    // <!-- <body>
+    //     <header id = "ExploratoryTitle"> 
+    //         <h1> Explorartory Room</h1>
+    //     </header>
+    //     <div id="uploadUI">
+    //         <h2>Upload Images</h2>
+    //         <input type="file" id="fileInput" multiple accept="image/*" />
+    //         <div id="imageList"></div>
+    //         <button id="startButton">Start 3D Marquee</button>
+    //     </div>
+    //     <div id = "marqueeContainer" style = "display: none;">
+    //         <div id="container3D" style="width: 100vw; height: 80vh;"></div>
+    //         <script type="module" src = "js/main.js"></script>
+    //     </div>
+
+    // </body> -->

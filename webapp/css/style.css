@@ -132,7 +132,7 @@ canvas{
 body{
   font-family: "Akkurat Mono";
   background-color: #f3dada;
-  color: black;
+  color: rgb(255, 255, 255);
 }
 
 p{

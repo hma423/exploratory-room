@@ -38,26 +38,31 @@ const imageCount = 5;
 const totalWidth = slideCount * (slideWidth + gap);
 const slideUnit = slideWidth + gap;
 
-const slides = [];
-let currentPosition  = 0; 
-let targetPosition =0;
-let isScrolling = false;
-let autoScrollSpeed = 0;
-let lastTime = 0; 
-let touchStartX = 0;
-let touchLastX = 0;
-let prevPosition = 0 ;
+class Slide{
+    constructor(){
+        this.currentPosition  = 0; 
+        this.targetPosition =0;
+        this.isScrolling = false;
+        this.autoScrollSpeed = 0;
+        this.lastTime = 0; 
+        this.touchStartX = 0;
+        this.touchLastX = 0;
+        this.prevPosition = 0 ;
+        this.currentDistortionFactor = 0 ;
+        this.targetdistortionFactor = 0 ;
+        this.peakVelocity = 0;
+        this.velocityHistory = [0,0,0,0,0];
+        this.slides= [];
+    }
+}
 
-let currentDistortionFactor = 0 ;
-let targetdistortionFactor = 0 ;
-let peakVelocity = 0;
-let velocityHistory = [0,0,0,0,0];
+const slide1 = new Slide();
 
 const correctImageColor = (texture) => {
     texture.colorSpace = THREE.SRGBColorSpace;
     return texture;
 };
-const createSlide = (index) =>{
+const createSlide = (index, offset, currSlide) =>{
     const geometry = new THREE.PlaneGeometry(slideWidth, slideHeight, 32, 16);
     const colors  = ["#FF5733", "#33FF57", "#3357ff", "#F3FF33", "#FF33F3"];
     const material = new THREE.MeshBasicMaterial({
@@ -67,7 +72,7 @@ const createSlide = (index) =>{
 
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.x = index * [slideWidth + gap];
-    mesh.position.y = 0.5
+    mesh.position.y = offset
     mesh.userData = {
         originalVertices: [...geometry.attributes.position.array],
         index, 
@@ -96,15 +101,15 @@ const createSlide = (index) =>{
         }
     );
     scene.add(mesh);
-    slides.push(mesh)
+    currSlide.push(mesh)
 
 } ;
 
 for ( let i =0; i <slideCount; i++){
-    createSlide(i);
+    createSlide(i, 0, slide1.slides);
 }
 
-slides.forEach(slide => {
+slide1.slides.forEach(slide => {
         slide.position.x -= totalWidth / 2;
         slide.userData.targetX = slide.position.x;
         slide.userData.currentX = slide.position.x;
@@ -140,12 +145,12 @@ slides.forEach(slide => {
 
 window.addEventListener("keydown", (e)=>{
     if (e.key == "ArrowLeft"){
-        targetPosition -= slideUnit;
-        targetdistortionFactor = Math.min(1.0, targetdistortionFactor + 0.3);
+        slide1.targetPosition -= slideUnit;
+        slide1.targetdistortionFactor = Math.min(1.0, slide1.targetdistortionFactor + 0.3);
     
     }else if (e.key == "ArrowRight"){
-        targetPosition += slideUnit;
-        targetdistortionFactor = Math.min(1.0, targetdistortionFactor +0.3);
+        slide1.targetPosition += slideUnit;
+        slide1.targetdistortionFactor = Math.min(1.0, slide1.targetdistortionFactor +0.3);
     }
 });
 window.addEventListener(
@@ -153,16 +158,16 @@ window.addEventListener(
     (e) =>{
         e.preventDefault();
         const wheelStrength = Math.abs(e.deltaY ) * 0.001;
-        targetdistortionFactor = Math.min(
+        slide1.targetdistortionFactor = Math.min(
             1.0,
-            targetdistortionFactor + wheelStrength);
-        targetPosition -= e.deltaY * settings.wheelSensitivity;
-        isScrolling = true;
-        autoScrollSpeed = Math.min(Math.abs(e.deltaY) * 0.005, 0.05) * Math.sign(e.deltaY);
+            slide1.targetdistortionFactor + wheelStrength);
+        slide1.targetPosition -= e.deltaY * settings.wheelSensitivity;
+        slide1.isScrolling = true;
+        slide1.autoScrollSpeed = Math.min(Math.abs(e.deltaY) * 0.005, 0.05) * Math.sign(e.deltaY);
 
         clearTimeout(window.scrollTimeout);
         window.scrollTimeout = setTimeout(() =>{
-            isScrolling = false;
+            slide1.isScrolling = false;
         }, 150);
     }, {passive: false}
 );
@@ -177,51 +182,51 @@ window.addEventListener("resize", ()=>{
 
 const animate = (time) => {
     requestAnimationFrame(animate);
-    const deltaTime = lastTime ? (time-lastTime)/ 1000: 0.016;
+    const deltaTime = slide1.lastTime ? (time-slide1.lastTime)/ 1000: 0.016;
 
-    const prevPos = currentPosition;
-    if (isScrolling){
-        targetPosition += autoScrollSpeed;
-        const speedBasedDecay = 0.97 - Math.abs(autoScrollSpeed) * 0.5;
-        autoScrollSpeed *= Math.max(0.92, speedBasedDecay);
+    const prevPos = slide1.currentPosition;
+    if (slide1.isScrolling){
+        slide1.targetPosition += slide1.autoScrollSpeed;
+        const speedBasedDecay = 0.97 - Math.abs(slide1.autoScrollSpeed) * 0.5;
+        slide1.autoScrollSpeed *= Math.max(0.92, speedBasedDecay);
         
-        if (Math.abs(autoScrollSpeed) < 0.001){
-            autoScrollSpeed = 0 ;
+        if (Math.abs(slide1.autoScrollSpeed) < 0.001){
+            slide1.autoScrollSpeed = 0 ;
         }
     
     }
-    currentPosition += (targetPosition- currentPosition) * settings.smoothing;
-    const currentVelocity = Math.abs(currentPosition - prevPos)/deltaTime;
-    velocityHistory.push(currentVelocity);
-    velocityHistory.shift();
+    slide1.currentPosition += (slide1.targetPosition- slide1.currentPosition) * settings.smoothing;
+    const currentVelocity = Math.abs(slide1.currentPosition - prevPos)/deltaTime;
+    slide1.velocityHistory.push(currentVelocity);
+    slide1.velocityHistory.shift();
 
     const avgVelocity = 
-        velocityHistory.reduce((sum, val) => sum + val, 0) / velocityHistory.length;
+        slide1.velocityHistory.reduce((sum, val) => sum + val, 0) / slide1.velocityHistory.length;
 
-    if (avgVelocity > peakVelocity){
-        peakVelocity = avgVelocity;
+    if (avgVelocity > slide1.peakVelocity){
+        slide1.peakVelocity = avgVelocity;
     }
     
-    const velocityRatio = avgVelocity / (peakVelocity + 0.001);
-    const isDecelerating = velocityRatio < 0.7 && peakVelocity > 0.5;
+    const velocityRatio = avgVelocity / (slide1.peakVelocity + 0.001);
+    const isDecelerating = velocityRatio < 0.7 && slide1.peakVelocity > 0.5;
 
-    peakVelocity *= 0.99;
+    slide1.peakVelocity *= 0.99;
     const movementDistortion = Math.min(1.0, currentVelocity * 0.1);
     if(currentVelocity > 0.05){
-        targetdistortionFactor = Math.max(
-            targetdistortionFactor,
+        slide1.targetdistortionFactor = Math.max(
+            slide1.targetdistortionFactor,
             movementDistortion
         );
     }
     if (isDecelerating || avgVelocity < 0.2){
         const decayRate = isDecelerating ? settings.distortionDecay : settings.distortionDecay * 0.9;
-        targetdistortionFactor*= decayRate;
+        slide1.targetdistortionFactor*= decayRate;
     }
-    currentDistortionFactor += (targetdistortionFactor- currentDistortionFactor) * 
+    slide1.currentDistortionFactor += (slide1.targetdistortionFactor- slide1.currentDistortionFactor) * 
     settings.distortionSmoothing;
 
-    slides.forEach((slide, i )=> {
-            let baseX = i * slideUnit - currentPosition;
+    slide1.slides.forEach((slide, i )=> {
+            let baseX = i * slideUnit - slide1.currentPosition;
             baseX = ((baseX % totalWidth) + totalWidth) % totalWidth;
             if (baseX > totalWidth / 2) baseX -= totalWidth;
 
@@ -234,7 +239,7 @@ const animate = (time) => {
             const wrapThreshold = totalWidth / 2 + slideWidth;
             if (Math.abs(slide.userData.currentX) < wrapThreshold * 1.5) {
                 slide.position.x = slide.userData.currentX;
-                // updateCurve(slide, slide.position.x, currentDistortionFactor);
+                // updateCurve(slide, slide.position.x, slide1.currentDistortionFactor);
             }
     });
 

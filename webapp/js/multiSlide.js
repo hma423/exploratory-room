@@ -19,6 +19,7 @@ const camera = new THREE.PerspectiveCamera(
 )
 camera.position.z = 5;
 
+
 const settings ={
     wheelSensitivity: 0.01,
     touchSensitivity: 0.01,
@@ -74,8 +75,13 @@ const createSlide = (index, offset, currSlide) =>{
     });
 
     const mesh = new THREE.Mesh(geometry, material);
+   
+    const angle = (index / slideCount) * Math.PI * 2;
     mesh.position.x = index * [slideWidth + gap];
-    mesh.position.y = offset
+    mesh.position.y = offset;
+    // Rotate to face outward toward the camera
+    // mesh.rotation.y = angle;    
+    // Rotate to face the center of the cylinder
     mesh.userData = {
         originalVertices: [...geometry.attributes.position.array],
         index, 
@@ -161,14 +167,18 @@ for (let i = 0; i< sliderCount; i++){
 // };
 
 window.addEventListener("keydown", (e)=>{
-    let slide1= slideManager[0];
+    // console.log(clientX, clientY);
+    let slide1= slideManager[2];
     if (e.key == "ArrowLeft"){
-        slide1.targetPosition -= slideUnit;
-        slide1.targetdistortionFactor = Math.min(1.0, slide1.targetdistortionFactor + 0.3);
-    
+        slideManager.forEach((slide) =>{
+            slide.targetPosition -= slideUnit;
+            slide.targetdistortionFactor = Math.min(1.0, slide1.targetdistortionFactor + 0.3);
+        });
     }else if (e.key == "ArrowRight"){
-        slide1.targetPosition += slideUnit;
-        slide1.targetdistortionFactor = Math.min(1.0, slide1.targetdistortionFactor +0.3);
+        slideManager.forEach((slide) =>{
+            slide.targetPosition += slideUnit;
+            slide.targetdistortionFactor = Math.min(1.0, slide1.targetdistortionFactor + 0.3);
+        });
     }
 });
 window.addEventListener(
@@ -200,30 +210,30 @@ window.addEventListener("resize", ()=>{
 
 const animate = (time) => {
     requestAnimationFrame(animate);
-    for (let i = 0 ;i< sliderCount; i++){
+    for (let i = 0; i < sliderCount; i++) {
         const currSlide = slideManager[i];
-        const deltaTime = currSlide.lastTime ? (time-currSlide.lastTime)/ 1000: 0.016;
+        const deltaTime = currSlide.lastTime ? (time - currSlide.lastTime) / 1000 : 0.016;
 
         const prevPos = currSlide.currentPosition;
-        if (currSlide.isScrolling){
+        if (currSlide.isScrolling) {
             currSlide.targetPosition += currSlide.autoScrollSpeed;
             const speedBasedDecay = 0.97 - Math.abs(currSlide.autoScrollSpeed) * 0.5;
             currSlide.autoScrollSpeed *= Math.max(0.92, speedBasedDecay);
             
-            if (Math.abs(currSlide.autoScrollSpeed) < 0.001){
-                currSlide.autoScrollSpeed = 0 ;
+            if (Math.abs(currSlide.autoScrollSpeed) < 0.001) {
+                currSlide.autoScrollSpeed = 0;
             }
-        
         }
-        currSlide.currentPosition += (currSlide.targetPosition- currSlide.currentPosition) * settings.smoothing;
-        const currentVelocity = Math.abs(currSlide.currentPosition - prevPos)/deltaTime;
+        
+        currSlide.currentPosition += (currSlide.targetPosition - currSlide.currentPosition) * settings.smoothing;
+        const currentVelocity = Math.abs(currSlide.currentPosition - prevPos) / deltaTime;
         currSlide.velocityHistory.push(currentVelocity);
         currSlide.velocityHistory.shift();
 
         const avgVelocity = 
             currSlide.velocityHistory.reduce((sum, val) => sum + val, 0) / currSlide.velocityHistory.length;
 
-        if (avgVelocity > currSlide.peakVelocity){
+        if (avgVelocity > currSlide.peakVelocity) {
             currSlide.peakVelocity = avgVelocity;
         }
         
@@ -232,39 +242,77 @@ const animate = (time) => {
 
         currSlide.peakVelocity *= 0.99;
         const movementDistortion = Math.min(1.0, currentVelocity * 0.1);
-        if(currentVelocity > 0.05){
+        if (currentVelocity > 0.05) {
             currSlide.targetdistortionFactor = Math.max(
                 currSlide.targetdistortionFactor,
                 movementDistortion
             );
         }
-        if (isDecelerating || avgVelocity < 0.2){
+        if (isDecelerating || avgVelocity < 0.2) {
             const decayRate = isDecelerating ? settings.distortionDecay : settings.distortionDecay * 0.9;
-            currSlide.targetdistortionFactor*= decayRate;
+            currSlide.targetdistortionFactor *= decayRate;
         }
-        currSlide.currentDistortionFactor += (currSlide.targetdistortionFactor- currSlide.currentDistortionFactor) * 
-        settings.distortionSmoothing;
+        currSlide.currentDistortionFactor += (currSlide.targetdistortionFactor - currSlide.currentDistortionFactor) * 
+            settings.distortionSmoothing;
 
-        currSlide.slides.forEach((slide, i )=> {
-                let baseX = i * slideUnit - currSlide.currentPosition;
-                baseX = ((baseX % totalWidth) + totalWidth) % totalWidth;
-                if (baseX > totalWidth / 2) baseX -= totalWidth;
+        // 3D carousel settings
+        const carousel3D = {
+            radius: slideWidth * 2, // Distance from center for 3D positioning
+            maxRotation: Math.PI / 3, // Maximum rotation angle (60 degrees)
+            centerZone: slideWidth * 0.8, // Zone where slides are flat
+            depthRange: slideWidth * 0.5 // How far back slides can go
+        };
 
-                const isWrapping = Math.abs(baseX - slide.userData.targetX) > slideWidth * 2;
-                if (isWrapping) slide.userData.currentX = baseX;
+        currSlide.slides.forEach((slide, i) => {
+            let baseX = i * slideUnit - currSlide.currentPosition;
+            baseX = ((baseX % totalWidth) + totalWidth) % totalWidth;
+            if (baseX > totalWidth / 2) baseX -= totalWidth;
 
-                slide.userData.targetX = baseX;
-                slide.userData.currentX += (slide.userData.targetX - slide.userData.currentX) * settings.slideLerp;
+            const isWrapping = Math.abs(baseX - slide.userData.targetX) > slideWidth * 2;
+            if (isWrapping) slide.userData.currentX = baseX;
 
-                const wrapThreshold = totalWidth / 2 + slideWidth;
-                if (Math.abs(slide.userData.currentX) < wrapThreshold * 1.5) {
-                    slide.position.x = slide.userData.currentX;
-                    // updateCurve(slide, slide.position.x, currSlide.currentDistortionFactor);
+            slide.userData.targetX = baseX;
+            slide.userData.currentX += (slide.userData.targetX - slide.userData.currentX) * settings.slideLerp;
+
+            const wrapThreshold = totalWidth / 2 + slideWidth;
+            if (Math.abs(slide.userData.currentX) < wrapThreshold * 1.5) {
+                // Calculate 3D transformation based on distance from center
+                const distanceFromCenter = Math.abs(slide.userData.currentX);
+                const normalizedDistance = Math.min(1, Math.max(0, 
+                    (distanceFromCenter - carousel3D.centerZone) / (slideWidth * 2)
+                ));
+                
+                // Calculate rotation based on position
+                const rotationIntensity = normalizedDistance;
+                const rotationY = slide.userData.currentX > 0 ? 
+                    -carousel3D.maxRotation * rotationIntensity : 
+                    carousel3D.maxRotation * rotationIntensity;
+                
+                // Calculate depth (Z position) - slides move back as they rotate
+                const depth = -carousel3D.depthRange * normalizedDistance * normalizedDistance;
+                
+                // Calculate X position adjustment for circular motion
+                const radiusOffset = Math.sin(rotationY) * carousel3D.radius * 0.3;
+                const adjustedX = slide.userData.currentX + radiusOffset;
+                
+                // Apply 3D transformations
+                slide.position.x = adjustedX;
+                slide.position.z = depth;
+                slide.rotation.y = rotationY;
+                
+                // Optional: Scale slides slightly as they move away
+                const scaleMultiplier = 1 - (normalizedDistance * 0.1);
+                slide.scale.set(scaleMultiplier, scaleMultiplier, 1);
+                
+                // Optional: Adjust opacity for depth effect
+                if (slide.material && slide.material.opacity !== undefined) {
+                    slide.material.opacity = Math.max(0.3, 1 - normalizedDistance * 0.4);
                 }
+            }
         });
+        
+        currSlide.lastTime = time;
     }
-    renderer.render(scene, camera)
-
-
+    renderer.render(scene, camera);
 };
 animate();

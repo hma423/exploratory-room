@@ -31,9 +31,9 @@ const settings ={
     distortionSensitivity: 0.15, 
     distortionSmoothing: 0.075,
 }
-const slideWidth = 2.0;
-const slideHeight = 0.8;
-const gap = 0.1; 
+const slideWidth = 1.0;
+const slideHeight = 0.5;
+const gap = 0.3; 
 const slideCount = 10;
 const imageCount = 5;
 const totalWidth = slideCount * (slideWidth + gap);
@@ -66,7 +66,7 @@ const correctImageColor = (texture) => {
     texture.colorSpace = THREE.SRGBColorSpace;
     return texture;
 };
-const createSlide = (index, offset, currSlide) =>{
+const createSlide = (index, offset, currSlide, slide_index) =>{
     const geometry = new THREE.PlaneGeometry(slideWidth, slideHeight, 32, 16);
     const colors  = ["#FF5733", "#33FF57", "#3357ff", "#F3FF33", "#FF33F3"];
     const material = new THREE.MeshBasicMaterial({
@@ -77,7 +77,7 @@ const createSlide = (index, offset, currSlide) =>{
     const mesh = new THREE.Mesh(geometry, material);
    
     const angle = (index / slideCount) * Math.PI * 2;
-    mesh.position.x = index * [slideWidth + gap];
+    mesh.position.x = slide_index * 0.9 + index * [slideWidth + gap];
     mesh.position.y = offset;
     // Rotate to face outward toward the camera
     // mesh.rotation.y = angle;    
@@ -114,8 +114,8 @@ const createSlide = (index, offset, currSlide) =>{
 
 } ;
 
-
-let spacing = [-1.629, -0.41, 1.618 * 0.5, 1.629]
+const vertical_offset = 0.3;
+let spacing = [-1.23 + vertical_offset, -0.41 + vertical_offset, 0.41 + vertical_offset, 1.23+ vertical_offset]
 for (let i = 0; i< sliderCount; i++){
     let multiplier = -1.5
     if ( i > sliderCount /2 ){
@@ -123,7 +123,7 @@ for (let i = 0; i< sliderCount; i++){
     }
     console.log(multiplier)
     for ( let j =0; j <slideCount; j++){
-        createSlide(j, spacing[i], slideManager[i].slides);
+        createSlide(j, spacing[i], slideManager[i].slides, i);
     }
 }
 
@@ -257,10 +257,10 @@ const animate = (time) => {
 
         // 3D carousel settings
         const carousel3D = {
-            radius: slideWidth * 2, // Distance from center for 3D positioning
-            maxRotation: Math.PI / 3, // Maximum rotation angle (60 degrees)
-            centerZone: slideWidth * 0.8, // Zone where slides are flat
-            depthRange: slideWidth * 0.5 // How far back slides can go
+            radius: slideWidth , // Distance from center for 3D positioning
+            maxRotation: Math.PI /3, // Maximum rotation angle (60 degrees)
+            centerZone: slideWidth* 0, // Zone where slides are flat
+            depthRange: slideWidth * 0 // How far back slides can go
         };
 
         currSlide.slides.forEach((slide, i) => {

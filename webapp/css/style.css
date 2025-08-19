@@ -131,7 +131,7 @@ canvas{
 
 body{
   font-family: "Akkurat Mono";
-  background-color: #f3dada;
+  background-color: rgb(0, 0, 0);
   color: rgb(255, 255, 255);
 }
 
@@ -159,4 +159,8 @@ nav{
 }
 footer{
   bottom: 0
+}
+.upload{
+    align-items: center;
+    justify-content: center;
 }
